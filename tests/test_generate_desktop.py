@@ -24,7 +24,8 @@ generate_desktop_file = generate_desktop.generate_desktop_file
 def test_generate_desktop_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
-    generated_path = generate_desktop_file()
+    # Pass sys.executable explicitly to match test expectations
+    generated_path = generate_desktop_file(exec_path=sys.executable)
 
     assert generated_path.exists()
     assert generated_path == tmp_path / "kstars-sync.desktop"

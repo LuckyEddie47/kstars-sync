@@ -6,18 +6,20 @@ Generates a .desktop launcher file pointing to the installed kstars-sync binary.
 """
 
 import shutil
+import sys
 from pathlib import Path
 
 
-def generate_desktop_file() -> Path:
-    # Find kstars-sync in PATH or default to ~/.local/bin/kstars-sync
-    exe_path = shutil.which("kstars-sync") or str(Path.home() / ".local/bin/kstars-sync")
+def generate_desktop_file(exec_path: Path | str | None = None) -> Path:
+    """Generate a .desktop launcher file for kstars-sync."""
+    if exec_path is None:
+        exec_path = shutil.which("kstars-sync") or str(Path.home() / ".local/bin/kstars-sync")
 
     desktop_content = f"""[Desktop Entry]
 Type=Application
 Name=KStars Sync
 Comment=Synchronise KStars Git repository before and after running KStars
-Exec={exe_path}
+Exec={exec_path}
 Icon=kstars
 Terminal=true
 Categories=Education;Science;Astronomy;

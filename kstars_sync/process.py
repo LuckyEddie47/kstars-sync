@@ -94,16 +94,17 @@ def find_process(executable: str | Path) -> Optional[ProcessInfo]:
     return None
 
 
-def is_running(executable_path: Path) -> bool:
+def is_running(executable_path: Path | str) -> bool:
     """
     Check if an application matching the executable path or name is currently running.
     """
-    target_name = executable_path.name.lower()
+    path_obj = Path(executable_path)
+    resolved_target = path_obj.resolve()
+    target_name = path_obj.name.lower()
     current_pid = os.getpid()
 
     for proc in psutil.process_iter(["pid", "name", "exe", "cmdline", "status"]):
         try:
-            # Skip the current kstars-sync process itself and zombies
             if proc.info["pid"] == current_pid:
                 continue
             if proc.info.get("status") == psutil.STATUS_ZOMBIE:
@@ -111,15 +112,15 @@ def is_running(executable_path: Path) -> bool:
 
             # 1. Match exact resolved executable path
             proc_exe = proc.info.get("exe")
-            if proc_exe and Path(proc_exe).resolve() == executable_path.resolve():
+            if proc_exe and Path(proc_exe).resolve() == resolved_target:
                 return True
 
-            # 2. Match process name (e.g. "kstars")
+            # 2. Match process name
             proc_name = proc.info.get("name") or ""
             if proc_name.lower() == target_name:
                 return True
 
-            # 3. Match executable name in command line arguments
+            # 3. Match executable name in cmdline
             cmdline = proc.info.get("cmdline") or []
             if any(target_name == Path(arg).name.lower() for arg in cmdline if arg):
                 return True
