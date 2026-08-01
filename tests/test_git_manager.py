@@ -172,3 +172,110 @@ def test_validate_repository_without_upstream(tmp_path):
 
     with pytest.raises(GitError):
         gm.validate_repository()
+
+
+def test_changed_paths_includes_tracked_and_untracked(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    initialise_repo(repo)
+
+    commit_file(repo, "tracked.txt", "original", "tracked file")
+
+    (repo / "tracked.txt").write_text("modified")
+    (repo / "untracked.txt").write_text("new")
+
+    gm = GitManager(repo)
+
+    assert gm.changed_paths() == [
+        "tracked.txt",
+        "untracked.txt",
+    ]
+
+
+def test_tracked_changed_paths_excludes_untracked(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    initialise_repo(repo)
+
+    commit_file(repo, "tracked.txt", "original", "tracked file")
+
+    (repo / "tracked.txt").write_text("modified")
+    (repo / "untracked.txt").write_text("new")
+
+    gm = GitManager(repo)
+
+    assert gm.tracked_changed_paths() == ["tracked.txt"]
+
+
+def test_add_paths_stages_only_selected_paths(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    initialise_repo(repo)
+
+    commit_file(repo, "one.txt", "one", "one")
+    commit_file(repo, "two.txt", "two", "two")
+
+    (repo / "one.txt").write_text("changed one")
+    (repo / "two.txt").write_text("changed two")
+
+    gm = GitManager(repo)
+    gm.add_paths(["one.txt"])
+
+    assert git(repo, "diff", "--cached", "--name-only") == "one.txt"
+    assert git(repo, "diff", "--name-only") == "two.txt"
+
+
+def test_commit_paths_does_not_include_unselected_staged_change(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    initialise_repo(repo)
+
+    commit_file(repo, "one.txt", "one", "one")
+    commit_file(repo, "two.txt", "two", "two")
+
+    (repo / "one.txt").write_text("changed one")
+    (repo / "two.txt").write_text("changed two")
+
+    git(repo, "add", "two.txt")
+
+    gm = GitManager(repo)
+    gm.add_paths(["one.txt"])
+    gm.commit_paths("selective commit", ["one.txt"])
+
+    committed = git(repo, "show", "--name-only", "--format=", "HEAD")
+    assert committed == "one.txt"
+
+    staged = git(repo, "diff", "--cached", "--name-only")
+    assert staged == "two.txt"
+
+
+def test_commit_paths_supports_selected_untracked_file(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    initialise_repo(repo)
+
+    (repo / "new.txt").write_text("new")
+
+    gm = GitManager(repo)
+    gm.add_paths(["new.txt"])
+    gm.commit_paths("add new file", ["new.txt"])
+
+    assert git(repo, "show", "--name-only", "--format=", "HEAD") == "new.txt"
+
+
+def test_restore_paths_discards_only_selected_tracked_changes(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    initialise_repo(repo)
+
+    commit_file(repo, "one.txt", "one", "one")
+    commit_file(repo, "two.txt", "two", "two")
+
+    (repo / "one.txt").write_text("changed one")
+    (repo / "two.txt").write_text("changed two")
+
+    gm = GitManager(repo)
+    gm.restore_paths(["one.txt"])
+
+    assert (repo / "one.txt").read_text() == "one"
+    assert (repo / "two.txt").read_text() == "changed two"

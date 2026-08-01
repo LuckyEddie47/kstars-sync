@@ -28,6 +28,7 @@ class Config:
     repo: Path
     kstars: Path
     continue_without_fetch: bool
+    compare_userdb: bool
     dry_run: bool
     verbose: bool
 
@@ -97,6 +98,7 @@ def load_config(argv: Optional[list[str]] = None) -> Config:
         "repo": Path(__file__).resolve().parent,
         "kstars": Path("/usr/bin/kstars"),
         "continue_without_fetch": False,
+        "compare_userdb": True,
     }
 
     file_values = _load_config_file(args.config)
@@ -109,10 +111,16 @@ def load_config(argv: Optional[list[str]] = None) -> Config:
         defaults["continue_without_fetch"],
     )
 
+    compare_userdb = file_values.get(
+        "compare_userdb",
+        defaults["compare_userdb"],
+    )
+
     return Config(
         repo=repo.expanduser().resolve(),
         kstars=kstars.expanduser().resolve(),
         continue_without_fetch=continue_without_fetch,
+        compare_userdb=compare_userdb,
         dry_run=args.dry_run,
         verbose=args.verbose,
     )
@@ -174,6 +182,14 @@ def _load_config_file(path: Path) -> dict:
                 "continue_without_fetch"
             )
 
+    if parser.has_section("sqlite"):
+        section = parser["sqlite"]
+
+        if "compare_userdb" in section:
+            values["compare_userdb"] = section.getboolean(
+                "compare_userdb"
+            )
+
     if parser.has_section("kstars"):
         section = parser["kstars"]
 
@@ -181,4 +197,3 @@ def _load_config_file(path: Path) -> dict:
             values["kstars"] = Path(section["path"])
 
     return values
-

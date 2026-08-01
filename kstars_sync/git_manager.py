@@ -149,6 +149,50 @@ class GitManager:
         result = self._run("status", "--porcelain=v1")
         return result.stdout.rstrip()
 
+    def changed_paths(self) -> list[str]:
+        """
+        Return all changed tracked and untracked paths.
+
+        Tracked changes include staged and unstaged modifications relative to
+        HEAD. Untracked paths respect the repository's normal ignore rules.
+        """
+        tracked = self._run(
+            "diff",
+            "--name-only",
+            "-z",
+            "HEAD",
+        ).stdout.split("\0")
+
+        untracked = self._run(
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ).stdout.split("\0")
+
+        return sorted(
+            {
+                path
+                for path in tracked + untracked
+                if path
+            }
+        )
+
+    def tracked_changed_paths(self) -> list[str]:
+        """Return changed tracked paths, including staged and unstaged changes."""
+        result = self._run(
+            "diff",
+            "--name-only",
+            "-z",
+            "HEAD",
+        )
+
+        return sorted(
+            path
+            for path in result.stdout.split("\0")
+            if path
+        )
+
     def diff_summary(self) -> str:
         """Return a diffstat summary."""
         result = self._run("diff", "--stat")
@@ -162,9 +206,35 @@ class GitManager:
         """Stage all changes."""
         self._run("add", "-A")
 
+    def add_paths(self, paths: list[str]) -> None:
+        """Stage all changes affecting the supplied paths."""
+        if not paths:
+            return
+
+        self._run("add", "-A", "--", *paths)
+
     def commit(self, message: str) -> None:
         """Create a commit."""
         self._run("commit", "-m", message)
+
+    def commit_paths(self, message: str, paths: list[str]) -> None:
+        """
+        Commit only the supplied paths.
+
+        ``--only`` ensures unrelated staged changes are not accidentally
+        included in a selective commit.
+        """
+        if not paths:
+            raise GitError("No paths were selected for commit.")
+
+        self._run(
+            "commit",
+            "--only",
+            "-m",
+            message,
+            "--",
+            *paths,
+        )
 
     def push(self) -> None:
         """Push to the configured upstream."""
@@ -189,3 +259,18 @@ class GitManager:
     def restore(self) -> None:
         """Discard tracked modifications."""
         self._run("restore", ".")
+
+
+    def restore_paths(self, paths: list[str]) -> None:
+        """Discard staged and unstaged changes for selected tracked paths."""
+        if not paths:
+            return
+
+        self._run(
+            "restore",
+            "--source=HEAD",
+            "--staged",
+            "--worktree",
+            "--",
+            *paths,
+        )

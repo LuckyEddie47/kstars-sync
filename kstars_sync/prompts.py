@@ -85,6 +85,58 @@ def choose_action(
         print("Invalid choice.")
 
 
+def choose_items(
+    message: str,
+    options: list[str],
+) -> list[str]:
+    """
+    Select zero or more items from a numbered list.
+
+    Input accepts:
+    - ``a`` or ``all`` for every item;
+    - ``n``, ``none``, or a blank line for no items;
+    - comma-separated item numbers such as ``1,3,4``.
+    """
+
+    print(message)
+
+    for index, option in enumerate(options, start=1):
+        print(f"{index}) {option}")
+
+    while True:
+        answer = input(
+            "Select numbers separated by commas "
+            "[a=all, n=none]: "
+        ).strip().lower()
+
+        if answer in ("", "n", "none"):
+            return []
+
+        if answer in ("a", "all"):
+            return list(options)
+
+        parts = [part.strip() for part in answer.split(",")]
+
+        try:
+            indices = [int(part) for part in parts]
+        except ValueError:
+            print("Enter comma-separated numbers, 'a', or 'n'.")
+            continue
+
+        if (
+            not indices
+            or any(index < 1 or index > len(options) for index in indices)
+        ):
+            print("Invalid selection.")
+            continue
+
+        if len(set(indices)) != len(indices):
+            print("Do not select the same item more than once.")
+            continue
+
+        return [options[index - 1] for index in indices]
+
+
 def show_summary(
     title: str,
     summary: str,

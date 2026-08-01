@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from kstars_sync.prompts import (
     choose_action,
+    choose_items,
     confirm,
     request_commit_message,
 )
@@ -42,3 +43,43 @@ def test_commit_message_default():
         assert request_commit_message(
             "default"
         ) == "default"
+
+
+def test_choose_items_all():
+    with patch("builtins.input", return_value="a"):
+        assert choose_items(
+            "Select",
+            ["one", "two", "three"],
+        ) == ["one", "two", "three"]
+
+
+def test_choose_items_none_blank():
+    with patch("builtins.input", return_value=""):
+        assert choose_items(
+            "Select",
+            ["one", "two"],
+        ) == []
+
+
+def test_choose_items_specific_numbers():
+    with patch("builtins.input", return_value="1,3"):
+        assert choose_items(
+            "Select",
+            ["one", "two", "three"],
+        ) == ["one", "three"]
+
+
+def test_choose_items_reprompts_after_invalid_selection():
+    with patch("builtins.input", side_effect=["4", "2"]):
+        assert choose_items(
+            "Select",
+            ["one", "two"],
+        ) == ["two"]
+
+
+def test_choose_items_rejects_duplicate_numbers():
+    with patch("builtins.input", side_effect=["1,1", "1"]):
+        assert choose_items(
+            "Select",
+            ["one", "two"],
+        ) == ["one"]

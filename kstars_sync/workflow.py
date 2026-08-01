@@ -18,6 +18,7 @@ from kstars_sync.config import (
 )
 from kstars_sync.git_manager import GitError, GitManager
 from kstars_sync.process import ProcessError
+from kstars_sync.session import SessionError
 
 
 def run_workflow(config: Config) -> int:
@@ -71,20 +72,46 @@ def run_workflow(config: Config) -> int:
         print("Pre-launch sync aborted.", file=sys.stderr)
         return 1
 
+    database_snapshot = None
+
+    if config.compare_userdb:
+        try:
+            database_snapshot = session.preserve_userdb(config.repo)
+        except SessionError as ex:
+            print(
+                f"Failed to preserve KStars database: {ex}",
+                file=sys.stderr,
+            )
+            return 1
+
     try:
-        app_result = process.run_application(config.kstars)
-    except ProcessError as ex:
-        print(f"Failed to launch KStars: {ex}", file=sys.stderr)
-        return 1
+        try:
+            app_result = process.run_application(config.kstars)
+        except ProcessError as ex:
+            print(f"Failed to launch KStars: {ex}", file=sys.stderr)
+            return 1
 
-    if not session.should_proceed_after_exit(app_result.returncode):
-        print("Post-launch cleanup skipped.", file=sys.stderr)
-        return app_result.returncode
+        if database_snapshot is not None:
+            try:
+                session.reconcile_userdb(database_snapshot)
+            except SessionError as ex:
+                print(
+                    f"Could not reconcile KStars database: {ex}",
+                    file=sys.stderr,
+                )
 
-    try:
-        session.post_launch_cleanup(git_manager)
-    except GitError as ex:
-        print(f"Error during post-launch cleanup: {ex}", file=sys.stderr)
-        return 1
+        if not session.should_proceed_after_exit(app_result.returncode):
+            print("Post-launch cleanup skipped.", file=sys.stderr)
+            return app_result.returncode
 
-    return 0
+        try:
+            session.post_launch_cleanup(git_manager)
+        except GitError as ex:
+            print(f"Error during post-launch cleanup: {ex}", file=sys.stderr)
+            return 1
+
+        return 0
+
+    finally:
+        if database_snapshot is not None:
+            database_snapshot.cleanup()
